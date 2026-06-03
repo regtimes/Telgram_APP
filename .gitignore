@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Настройки проекта PyCharm и локальная база данных склада
+.idea/
+*.iml
+warehouse_bot.db
