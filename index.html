@@ -129,12 +129,15 @@
         <button type="submit" class="main-btn">🚀 Отправить данные в чат</button>
     </form>
 
-    <script>
+        <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // Динамический вывод ручного ввода названия, если его нет в списке
+        // Укажите здесь вашу Ngrok-ссылку, как и в файле office.html
+        const API_BASE = "https://ВАШ_NGROK_ИЛИ_IP_СЕРВЕРА";
+        const userId = tg.initDataUnsafe?.user?.id || 0;
+
         function checkCustomDevice(select) {
             const customInput = document.getElementById('custom-device-name');
             if (select.value === 'custom') {
@@ -146,13 +149,11 @@
             }
         }
 
-        // Показываем текстовое поле поломки, только если статус "Неисправен"
         function toggleDamageDescription(select) {
             const damageGroup = document.getElementById('damage-group');
             damageGroup.style.display = select.value === 'Неисправен' ? 'block' : 'none';
         }
 
-        // Функция вызова родного сканера Telegram
         function scanBarcode() {
             if (tg.showScanQrPopup) {
                 tg.showScanQrPopup({ text: "Наведите камеру на штрихкод устройства" }, function(text) {
@@ -161,11 +162,27 @@
                     return true;
                 });
             } else {
-                alert("Сканер недоступен в этой версии Telegram. Введите код вручную.");
+                alert("Сканер недоступен. Введите код вручную.");
             }
         }
 
-        // Сбор данных формы и отправка их обратно в бота через tg.sendData
+        // НОВАЯ ФУНКЦИЯ: Динамическая подгрузка адресатов из базы данных бота
+        async function loadDestinations() {
+            try {
+                const res = await fetch(`${API_BASE}/api/get_destinations?user_id=${userId}`);
+                const locations = await res.json();
+                const select = document.getElementById('destination');
+
+                select.innerHTML = '<option value="" disabled selected>-- Выберите адресата --</option>';
+
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc}">${loc}</option>`;
+                });
+            } catch(e) {
+                document.getElementById('destination').innerHTML = '<option value="Склад">Центральный склад (Резерв)</option>';
+            }
+        }
+
         function sendData(event) {
             event.preventDefault();
 
@@ -178,7 +195,6 @@
             const condition = document.getElementById('condition').value;
             const damageDescription = condition === 'Неисправен' ? document.getElementById('damage-text').value : '';
 
-            // Формируем аккуратный JSON-пакет для передачи в Python
             const resultData = {
                 action: "send_inventory",
                 barcode: barcode,
@@ -188,10 +204,10 @@
                 description: damageDescription
             };
 
-            // Метод tg.sendData превращает JSON в строку и "кидает" обратно в бота
             tg.sendData(JSON.stringify(resultData));
-            tg.close(); // Закрываем Web App окно автоматически
+            tg.close();
         }
+
+        // Запускаем подгрузку адресатов при открытии формы
+        loadDestinations();
     </script>
-</body>
-</html>
