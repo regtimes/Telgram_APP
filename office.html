@@ -98,12 +98,12 @@
         </div>
     </div>
 
-    <script>
+        <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // Ссылка на ваш рабочий сервер API Ngrok
+        // Укажите здесь вашу Ngrok-ссылку, когда запустите бота локально
         const API_BASE = "https://ВАШ_NGROK_ИЛИ_IP_СЕРВЕРА"; 
         const userId = tg.initDataUnsafe?.user?.id || 0;
 
@@ -111,7 +111,9 @@
             document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(sectionId).classList.add('active');
-            if(event) event.target.classList.add('active');
+            if (event && event.target && event.target.classList) {
+                event.target.classList.add('active');
+            }
         }
 
         async function loadProfile() {
@@ -122,13 +124,11 @@
                 document.getElementById('user-role').innerText = profile.role;
 
                 if (profile.role === 'Operator') {
-                    // Настраиваем интерфейс под оператора: скрываем складские вкладки
                     document.getElementById('office-title').innerText = "📖 Технический кабинет";
                     document.getElementById('admin-tabs').style.display = 'none';
                     switchTab('operator-sec');
                     loadTechDocs();
                 } else {
-                    // Настраиваем интерфейс под менеджмент (Админ / Куратор)
                     document.getElementById('office-title').innerText = "🏢 Офис Склада";
                     document.getElementById('admin-tabs').style.display = 'flex';
                     if (profile.role !== 'Administrator' && profile.role !== 'Curator') {
@@ -161,7 +161,6 @@
             }
         }
 
-        // Загрузка картинок и описаний оборудования для оператора
         async function loadTechDocs() {
             try {
                 const res = await fetch(`${API_BASE}/api/tech_docs`);
@@ -189,8 +188,29 @@
             const region = document.getElementById('azs-region').value;
             try {
                 const res = await fetch(`${API_BASE}/api/add_azs`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name, region: region, curator_id: userId })
                 });
                 const result = await res.json();
                 if (result.success) {
+                    alert("🎉 АЗС успешно добавлена!");
+                    document.getElementById('add-azs-sec').querySelector('form').reset();
+                    switchTab('inventory-sec');
+                    loadInventory();
+                } else { 
+                    alert("❌ Ошибка: " + result.error); 
+                }
+            } catch(e) { 
+                alert("❌ Ошибка отправки."); 
+            }
+        }
+
+        function exportExcel() {
+            window.open(`${API_BASE}/api/export_excel?user_id=${userId}`, '_blank');
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>
