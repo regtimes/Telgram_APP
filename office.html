@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Офис Логистики</title>
+    <title>Офис Логистики STS</title>
     <script src="https://telegram.org"></script>
     <style>
         :root {
@@ -16,8 +16,7 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
+            background: var(--bg-color); color: var(--text-color);
             padding: 16px; margin: 0; box-sizing: border-box;
         }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -30,29 +29,35 @@
         .form-group { margin-bottom: 12px; }
         label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
         input { width: 100%; padding: 10px; border: 1px solid var(--hint-color); border-radius: 8px; background: var(--bg-color); color: var(--text-color); box-sizing: border-box; }
-        .btn { background: var(--btn-color); color: var(--btn-text); border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 5px; }
+        .btn { background: var(--btn-color); color: var(--btn-text); border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; }
+        
+        /* Стили для склада (Таблица) */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--secondary-bg); }
         th { background: var(--secondary-bg); font-weight: bold; }
-        .status-ok { color: #28a745; }
-        .status-fail { color: #dc3545; }
+        
+        /* Стили для Кабинета Оператора (Техническая база) */
+        .tech-card { background: var(--secondary-bg); border-radius: 12px; padding: 14px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .tech-card img { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; background: #ddd; }
+        .tech-card h4 { margin: 0 0 6px 0; font-size: 16px; }
+        .tech-card p { margin: 0; font-size: 13px; color: var(--text-color); line-height: 1.4; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h3>🏢 Личный кабинет</h3>
+        <h3 id="office-title">🏢 Офис Склада</h3>
         <span id="user-role" class="badge">Загрузка...</span>
     </div>
 
-    <!-- Вкладки управления -->
-    <div class="tabs">
+    <!-- Вкладки управления (Скрыты по умолчанию) -->
+    <div class="tabs" id="admin-tabs" style="display: none;">
         <button id="tab-inv" class="tab active" onclick="switchTab('inventory-sec')">📦 Баланс инвентаря</button>
-        <button id="tab-add-azs" class="tab" style="display: none;" onclick="switchTab('add-azs-sec')">➕ Добавить АЗС</button>
+        <button id="tab-add-azs" class="tab" onclick="switchTab('add-azs-sec')">➕ Добавить АЗС</button>
     </div>
 
-    <!-- СЕКЦИЯ 1: Просмотр баланса инвентаря -->
-    <div id="inventory-sec" class="content-section active">
+    <!-- СЕКЦИЯ 1: Просмотр баланса инвентаря (Для Админов и Кураторов) -->
+    <div id="inventory-sec" class="content-section">
         <button class="btn" style="background: #28a745; margin-bottom: 15px;" onclick="exportExcel()">📥 Выгрузить отчет в Excel</button>
         <div style="overflow-x: auto;">
             <table>
@@ -71,7 +76,7 @@
         </div>
     </div>
 
-    <!-- СЕКЦИЯ 2: Регистрация АЗС (Доступно только Кураторам и Админам) -->
+    <!-- СЕКЦИЯ 2: Регистрация АЗС (Для Кураторов и Админов) -->
     <div id="add-azs-sec" class="content-section">
         <form onsubmit="registerAZS(event)">
             <div class="form-group">
@@ -86,12 +91,19 @@
         </form>
     </div>
 
+    <!-- СЕКЦИЯ 3: Технический кабинет (Строго для Операторов) -->
+    <div id="operator-sec" class="content-section">
+        <div id="tech-docs-container">
+            <div style="text-align:center; color:var(--hint-color)">Загрузка документации...</div>
+        </div>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
 
-        // Ссылка на ваш сервер API (замените на ваш Ngrok, когда запустите)
+        // Ссылка на ваш рабочий сервер API Ngrok
         const API_BASE = "https://ВАШ_NGROK_ИЛИ_IP_СЕРВЕРА"; 
         const userId = tg.initDataUnsafe?.user?.id || 0;
 
@@ -99,88 +111,86 @@
             document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(sectionId).classList.add('active');
-            event.target.classList.add('active');
+            if(event) event.target.classList.add('active');
         }
 
-        // Загрузка профиля и прав доступа
-        async def loadProfile() {
+        async function loadProfile() {
             try {
                 const res = await fetch(`${API_BASE}/api/profile?user_id=${userId}`);
                 const profile = await res.json();
                 
                 document.getElementById('user-role').innerText = profile.role;
 
-                // Если пользователь Администратор или Куратор — открываем вкладку создания АЗС
-                if (profile.role === 'Administrator' || profile.role === 'Curator') {
-                    document.getElementById('tab-add-azs').style.display = 'block';
+                if (profile.role === 'Operator') {
+                    // Настраиваем интерфейс под оператора: скрываем складские вкладки
+                    document.getElementById('office-title').innerText = "📖 Технический кабинет";
+                    document.getElementById('admin-tabs').style.display = 'none';
+                    switchTab('operator-sec');
+                    loadTechDocs();
+                } else {
+                    // Настраиваем интерфейс под менеджмент (Админ / Куратор)
+                    document.getElementById('office-title').innerText = "🏢 Офис Склада";
+                    document.getElementById('admin-tabs').style.display = 'flex';
+                    if (profile.role !== 'Administrator' && profile.role !== 'Curator') {
+                        document.getElementById('tab-add-azs').style.display = 'none';
+                    }
+                    switchTab('inventory-sec');
+                    loadInventory();
                 }
-                
-                loadInventory();
             } catch(e) {
                 document.getElementById('user-role').innerText = "Ошибка сети";
             }
         }
 
-        // Загрузка изолированного списка инвентаря
-        async def loadInventory() {
+        async function loadInventory() {
             try {
                 const res = await fetch(`${API_BASE}/api/inventory?user_id=${userId}`);
                 const items = await res.json();
                 const tbody = document.getElementById('inventory-table');
                 tbody.innerHTML = '';
-
                 if (items.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--hint-color)">Нет оборудования на балансе</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--hint-color)">Нет оборудования</td></tr>`;
                     return;
                 }
-
                 items.forEach(item => {
                     const statusClass = item.condition === 'Работает' ? 'status-ok' : 'status-fail';
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><code>${item.barcode}</code></td>
-                            <td>${item.device_name}</td>
-                            <td>*${item.current_location}*</td>
-                            <td class="${statusClass}">${item.condition}</td>
-                        </tr>
-                    `;
+                    tbody.innerHTML += `<tr><td><code>${item.barcode}</code></td><td>${item.device_name}</td><td>${item.current_location}</td><td class="${statusClass}">${item.condition}</td></tr>`;
                 });
             } catch(e) {
-                document.getElementById('inventory-table').innerHTML = `<tr><td colspan="4" style="text-align:center; color:red">Не удалось загрузить данные</td></tr>`;
+                document.getElementById('inventory-table').innerHTML = `<tr><td colspan="4" style="text-align:center; color:red">Ошибка данных</td></tr>`;
             }
         }
 
-        // Отправка формы создания новой АЗС
-        async def registerAZS(e) {
+        // Загрузка картинок и описаний оборудования для оператора
+        async function loadTechDocs() {
+            try {
+                const res = await fetch(`${API_BASE}/api/tech_docs`);
+                const docs = await res.json();
+                const container = document.getElementById('tech-docs-container');
+                container.innerHTML = '';
+
+                docs.forEach(doc => {
+                    container.innerHTML += `
+                        <div class="tech-card">
+                            <img src="${doc.image_url}" alt="${doc.title}">
+                            <h4>${doc.title}</h4>
+                            <p>${doc.description}</p>
+                        </div>
+                    `;
+                });
+            } catch(e) {
+                document.getElementById('tech-docs-container').innerHTML = `<div style="text-align:center; color:red">Не удалось загрузить инструкции</div>`;
+            }
+        }
+
+        async function registerAZS(e) {
             e.preventDefault();
             const name = document.getElementById('azs-name').value;
             const region = document.getElementById('azs-region').value;
-
             try {
                 const res = await fetch(`${API_BASE}/api/add_azs`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: name, region: region, curator_id: userId })
                 });
                 const result = await res.json();
                 if (result.success) {
-                    alert("🎉 АЗС успешно добавлена в вашу изолированную область!");
-                    document.getElementById('logistic-form').reset();
-                    switchTab('inventory-sec');
-                } else {
-                    alert("❌ Ошибка: " + result.error);
-                }
-            } catch(e) {
-                alert("❌ Ошибка отправки на сервер.");
-            }
-        }
-
-        function exportExcel() {
-            // Сюда мы прикрутим скачивание сгенерированного сервером Excel на Шаге 4
-            window.open(`${API_BASE}/api/export_excel?user_id=${userId}`, '_blank');
-        }
-
-        loadProfile();
-    </script>
-</body>
-</html>
