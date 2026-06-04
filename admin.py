@@ -89,6 +89,7 @@ async def process_user_id(message: types.Message, state: FSMContext):
                          reply_markup=kb_inline)
 
 
+# Исправлено: Добавлено автоматическое уведомление пользователя при ручной смене роли через /admin
 @admin_router.callback_query(F.data.startswith("setrole_"))
 async def process_set_role(callback: types.CallbackQuery):
     if not await is_admin(callback.from_user.id):
@@ -109,6 +110,23 @@ async def process_set_role(callback: types.CallbackQuery):
     if success:
         await callback.message.answer(f"✅ Роль пользователя `{target_id}` успешно изменена на *{new_role}*.",
                                       parse_mode="Markdown")
+
+        # Добавлен пропущенный блок уведомления пользователя в чат
+        try:
+            is_target_admin = (new_role == "Administrator")
+            if new_role != "User":
+                user_text = f"🎉 Вам изменены права доступа! Новая роль: **{new_role}**.\nТеперь вы можете открыть «🏢 Офис»."
+            else:
+                user_text = "❌ Ваши права доступа в личный кабинет были отозваны администратором."
+
+            await callback.bot.send_message(
+                chat_id=target_id,
+                text=user_text,
+                parse_mode="Markdown",
+                reply_markup=kb.get_start_keyboard(is_admin=is_target_admin)
+            )
+        except Exception:
+            pass
     else:
         await callback.message.answer("❌ Пользователь с таким ID не найден в базе данных.")
 
